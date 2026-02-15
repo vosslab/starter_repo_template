@@ -25,6 +25,7 @@ STYLE_FILES = [
 NOEXIST_ONLY_STYLE_FILES = [
 	'AGENTS.md',
 	'docs/AUTHORS.md',
+	'source_me.sh',
 ]
 DEVEL_SCRIPTS = [
 	'commit_changelog.py',
