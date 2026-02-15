@@ -137,6 +137,9 @@ def apply_simple_fixes(text: str) -> tuple[str, bool]:
 	fixed_text = fixed_text.replace("\u2022", "*")
 	fixed_text = fixed_text.replace("\u00B7", "*")
 
+	fixed_text = fixed_text.replace("\u2713 Yes", "Yes")
+	fixed_text = fixed_text.replace("\u2717 No", "No")
+
 	# Replace multiplication and division signs.
 	fixed_text = fixed_text.replace("\u00D7", "x")
 	fixed_text = fixed_text.replace("\u00F7", "/")
