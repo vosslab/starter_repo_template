@@ -18,9 +18,10 @@ class Colors:
 
 # Editable file lists
 STYLE_FILES = [
-	'PYTHON_STYLE.md',
-	'MARKDOWN_STYLE.md',
-	'REPO_STYLE.md',
+	'docs/PYTHON_STYLE.md',
+	'docs/MARKDOWN_STYLE.md',
+	'docs/REPO_STYLE.md',
+	'CLAUDE.md',
 ]
 NOEXIST_ONLY_STYLE_FILES = [
 	'AGENTS.md',
@@ -54,12 +55,14 @@ DEPRECATED_GITIGNORE_ENTRIES = [
 	'ascii_compliance.txt',
 ]
 REQUIRED_GITIGNORE_ENTRIES = [
+
 	'report_shebang.txt',
 	'report_pyflakes.txt',
 	'report_ascii_compliance.txt',
 	'.DS_Store',
 	'report_bandit.txt',
 	'report_pyright.txt',
+
 ]
 SKIP_WALK_DIRS = {
 	'.git',
@@ -147,23 +150,6 @@ def parse_args():
 	return args
 
 
-#============================================
-def choose_style_destination(repo_dir: str, styles: list[str]) -> str:
-	"""
-	Choose a destination directory for style guides in a repo.
-
-	Args:
-		repo_dir (str): Repository directory.
-		styles (list[str]): Style guide filenames.
-
-	Returns:
-		str: Destination directory for style guides.
-	"""
-	_ = styles
-	return os.path.join(repo_dir, 'docs')
-
-
-#============================================
 def is_repo_dir(repo_dir: str) -> bool:
 	"""
 	Check whether a directory looks like a git repository.
@@ -576,8 +562,12 @@ def build_source_maps(
 	]
 
 	source_map: dict[str, str] = {}
-	for filename in styles:
-		source_map[filename] = resolve_source_file(source_candidates, filename)
+	for target_rel_path in styles:
+		source_name = os.path.basename(target_rel_path)
+		source_map[target_rel_path] = resolve_source_file(
+			source_candidates,
+			source_name,
+		)
 
 	noexist_style_source_map: dict[str, str] = {}
 	for target_rel_path in noexist_only_style_files:
@@ -849,6 +839,8 @@ def main():
 	source_dir = resolve_source_dir(base_dir, args.source_dir)
 	styles = list(STYLE_FILES)
 	noexist_only_style_files = list(NOEXIST_ONLY_STYLE_FILES)
+	style_target_paths = list(styles)
+	noexist_style_target_paths = list(noexist_only_style_files)
 	devel_scripts = list(DEVEL_SCRIPTS)
 	test_scripts = list(TEST_SCRIPTS)
 	(
@@ -866,17 +858,17 @@ def main():
 	)
 
 	counts = {key: 0 for key in COUNTER_EXPECTED}
-	skipped_same_by_file = {filename: 0 for filename in styles}
-	copied_by_file = {filename: 0 for filename in styles}
-	updated_by_file = {filename: 0 for filename in styles}
+	skipped_same_by_file = {filename: 0 for filename in style_target_paths}
+	copied_by_file = {filename: 0 for filename in style_target_paths}
+	updated_by_file = {filename: 0 for filename in style_target_paths}
 	skipped_existing_noexist_styles_by_file = {
-		filename: 0 for filename in noexist_only_style_files
+		filename: 0 for filename in noexist_style_target_paths
 	}
 	skipped_source_noexist_styles_by_file = {
-		filename: 0 for filename in noexist_only_style_files
+		filename: 0 for filename in noexist_style_target_paths
 	}
 	copied_noexist_styles_by_file = {
-		filename: 0 for filename in noexist_only_style_files
+		filename: 0 for filename in noexist_style_target_paths
 	}
 	skipped_same_tests_by_file = {filename: 0 for filename in test_scripts}
 	copied_tests_by_file = {filename: 0 for filename in test_scripts}
@@ -918,7 +910,6 @@ def main():
 		counts['gitignore_deprecated_removed'] += gitignore_deprecated_removed_inc
 		counts['gitignore_deprecated_entries_removed'] += gitignore_deprecated_entries_removed_inc
 
-		dest_dir = choose_style_destination(repo_dir, styles)
 		docs_dir = os.path.join(repo_dir, 'docs')
 		if not os.path.isdir(docs_dir):
 			if args.dry_run:
@@ -957,9 +948,9 @@ def main():
 				print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} create {changelog_path}")
 			counts['created_changelog'] += 1
 
-		for filename in styles:
-			source_file = source_map[filename]
-			dest_file = os.path.join(dest_dir, filename)
+		for target_rel_path in styles:
+			source_file = source_map[target_rel_path]
+			dest_file = os.path.join(repo_dir, target_rel_path)
 
 			if os.path.abspath(dest_file) == source_file:
 				counts['skipped_source'] += 1
@@ -967,13 +958,20 @@ def main():
 				continue
 
 			try:
+				dest_parent = os.path.dirname(dest_file)
+				if dest_parent and not os.path.isdir(dest_parent):
+					if args.dry_run:
+						print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} mkdir {dest_parent}")
+					else:
+						os.makedirs(dest_parent, exist_ok=True)
+
 				dest_exists = os.path.isfile(dest_file)
 				is_same = False
 				if dest_exists:
 					is_same = filecmp.cmp(source_file, dest_file, shallow=False)
 				if is_same:
 					counts['skipped_same'] += 1
-					skipped_same_by_file[filename] += 1
+					skipped_same_by_file[target_rel_path] += 1
 					continue
 
 				if args.dry_run:
@@ -983,12 +981,12 @@ def main():
 					shutil.copy2(source_file, dest_file)
 				if dest_exists:
 					counts['updated'] += 1
-					updated_by_file[filename] += 1
+					updated_by_file[target_rel_path] += 1
 					if not args.dry_run:
 						print(f"{Colors.BLUE}[UPDATED]{Colors.RESET} {source_file} -> {dest_file}")
 				else:
 					counts['copied'] += 1
-					copied_by_file[filename] += 1
+					copied_by_file[target_rel_path] += 1
 					if not args.dry_run:
 						print(f"{Colors.BLUE}[COPIED]{Colors.RESET} {source_file} -> {dest_file}")
 			except Exception as e:
@@ -1207,7 +1205,7 @@ def main():
 			'by_file': [
 				{
 					'title': 'Skipped (same) by file:',
-					'filenames': styles,
+					'filenames': style_target_paths,
 					'counts': skipped_same_by_file,
 					'always_color': Colors.GREEN,
 				},
@@ -1219,13 +1217,13 @@ def main():
 				},
 				{
 					'title': 'No-overwrite files skipped (already exists):',
-					'filenames': noexist_only_style_files,
+					'filenames': noexist_style_target_paths,
 					'counts': skipped_existing_noexist_styles_by_file,
 					'always_color': Colors.GREEN,
 				},
 				{
 					'title': 'No-overwrite files skipped (source):',
-					'filenames': noexist_only_style_files,
+					'filenames': noexist_style_target_paths,
 					'counts': skipped_source_noexist_styles_by_file,
 					'always_color': Colors.GREEN,
 				},
@@ -1376,19 +1374,19 @@ def main():
 			'by_file': [
 				{
 					'title': 'Style guides copied by file:',
-					'filenames': styles,
+					'filenames': style_target_paths,
 					'counts': copied_by_file,
 					'positive_color': Colors.BLUE,
 				},
 				{
 					'title': 'Style guides updated by file:',
-					'filenames': styles,
+					'filenames': style_target_paths,
 					'counts': updated_by_file,
 					'positive_color': Colors.BLUE,
 				},
 				{
 					'title': 'No-overwrite files copied by file:',
-					'filenames': noexist_only_style_files,
+					'filenames': noexist_style_target_paths,
 					'counts': copied_noexist_styles_by_file,
 					'positive_color': Colors.BLUE,
 				},
