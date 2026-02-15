@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import stat
 import shutil
 import argparse
@@ -22,7 +21,10 @@ STYLE_FILES = [
 	'PYTHON_STYLE.md',
 	'MARKDOWN_STYLE.md',
 	'REPO_STYLE.md',
-	'AUTHORS.md',
+]
+NOEXIST_ONLY_STYLE_FILES = [
+	'AGENTS.md',
+	'docs/AUTHORS.md',
 ]
 DEVEL_SCRIPTS = [
 	'commit_changelog.py',
@@ -33,7 +35,6 @@ TEST_SCRIPTS = [
 	'fix_ascii_compliance.py',
 	'fix_whitespace.py',
 	'git_file_utils.py',
-	'pyrightconfig.json',
 	'test_import_requirements.py',
 	'test_import_star.py',
 ]
@@ -75,11 +76,12 @@ SKIP_WALK_DIRS = {
 COUNTER_EXPECTED = {
 	'copied': 0,
 	'updated': 0,
-	'updated_agents': 0,
-	'created_agents': 0,
+	'copied_noexist_styles': 0,
 	'created_changelog': 0,
 	'skipped_same': 0,
 	'skipped_source': 0,
+	'skipped_source_noexist_styles': 0,
+	'skipped_existing_noexist_styles': 0,
 	'skipped_non_repo': 0,
 	'errors': 0,
 	'copied_tests': 0,
@@ -119,8 +121,7 @@ def parse_args():
 	"""
 	parser = argparse.ArgumentParser(
 		description=(
-			"Copy style guides and repo docs into each repo under ~/nsh/, "
-			"placing them in docs/."
+			"Copy shared style/docs/scripts into each repo under ~/nsh/."
 		)
 	)
 	parser.add_argument(
@@ -131,7 +132,7 @@ def parse_args():
 		'--source-dir', dest='source_dir',
 		default=None,
 		help=(
-			'Directory containing style guides (default: <base>/junk-drawer when present; '
+			'Directory containing style guides (default: <base>/starter_repo_template when present; '
 			'otherwise the repo root containing this script; docs/ is preferred when present)'
 		)
 	)
@@ -246,237 +247,6 @@ def ensure_git_perms(repo_dir: str, dry_run: bool) -> bool:
 			add_group_write(os.path.join(root, f))
 
 	return changed
-
-
-#============================================
-def ensure_agents_coding_style(
-	agents_path: str,
-	style_paths: dict[str, str],
-	dry_run: bool
-) -> bool:
-	"""
-	Ensure AGENTS.md contains required repo guidance sections and lines.
-
-	Args:
-		agents_path (str): Path to AGENTS.md.
-		style_paths (dict[str, str]): Map of style filenames to repo-relative paths.
-		dry_run (bool): If True, do not write changes.
-
-	Returns:
-		bool: True if file was modified, False otherwise.
-	"""
-	with open(agents_path, 'r', encoding='utf-8') as f:
-		content = f.read()
-
-	lines = content.splitlines(keepends=True)
-
-	python_path = style_paths['PYTHON_STYLE.md']
-	markdown_path = style_paths['MARKDOWN_STYLE.md']
-	repo_style_path = style_paths['REPO_STYLE.md']
-
-	python_line = f"See Python coding style in {python_path}.\n"
-	markdown_line = f"See Markdown style in {markdown_path}.\n"
-	repo_style_line = f"See repo style in {repo_style_path}.\n"
-	changelog_line = "When making edits, document them in docs/CHANGELOG.md.\n"
-	user_request_line = (
-		"When in doubt, implement the changes the user asked for rather than waiting "
-		"for a response; the user is not the best reader and will likely miss your "
-		"request and then be confused why it was not implemented or fixed.\n"
-	)
-	tests_required_line = (
-		"When changing code always run tests, documentation does not require tests.\n"
-	)
-	tests_allowed_line = (
-		"Agents may run programs in the tests folder, including smoke tests and "
-		"pyflakes/mypy runner scripts.\n"
-	)
-	environment_header = "## Environment\n"
-	macos_python312_interpreter_line = (
-		"Codex must run Python using `/opt/homebrew/opt/python@3.12/bin/python3.12` "
-		"(use Python 3.12 only).\nThis is only for Codex's runtime, not a requirement "
-		"for repo scripts.\n"
-	)
-	macos_site_packages_line = (
-		"On this user's macOS (Homebrew Python 3.12), Python modules are installed to "
-		"`/opt/homebrew/lib/python3.12/site-packages/`.\n"
-	)
-	is_macos = (sys.platform == 'darwin')
-
-	def insert_after_environment_header(insert_lines: list[str]) -> bool:
-		for i, line in enumerate(lines):
-			if line.strip() == '## Environment':
-				lines[i + 1:i + 1] = insert_lines
-				return True
-		return False
-
-	changed = False
-	for filename, desired_path in (
-		('PYTHON_STYLE.md', python_path),
-		('MARKDOWN_STYLE.md', markdown_path),
-		('REPO_STYLE.md', repo_style_path),
-	):
-		if desired_path == filename:
-			continue
-		for i, line in enumerate(lines):
-			if filename in line and desired_path not in line:
-				lines[i] = line.replace(filename, desired_path)
-				changed = True
-
-	for i, line in enumerate(lines):
-		if 'CHANGELOG.md' in line and 'docs/CHANGELOG.md' not in line:
-			lines[i] = line.replace('CHANGELOG.md', 'docs/CHANGELOG.md')
-			changed = True
-
-	updated_content = ''.join(lines)
-
-	has_header = '## Coding Style' in updated_content
-	has_python = 'PYTHON_STYLE.md' in updated_content
-	has_markdown = 'MARKDOWN_STYLE.md' in updated_content
-	has_repo_style = 'REPO_STYLE.md' in updated_content
-	has_changelog = 'docs/CHANGELOG.md' in updated_content
-	has_user_request_line = (
-		"When in doubt, implement the changes the user asked for" in updated_content
-	)
-	has_tests_required_line = (
-		"When changing code always run tests" in updated_content
-	)
-	has_tests_allowed = 'Agents may run programs in the tests folder' in updated_content
-	has_environment_header = '## Environment' in updated_content
-	has_macos_python312_interpreter = (
-		'/opt/homebrew/opt/python@3.12/bin/python3.12' in updated_content
-	)
-	has_macos_site_packages = '/opt/homebrew/lib/python3.12/site-packages/' in updated_content
-
-	lines_to_add = []
-	if not has_header:
-		lines_to_add.append('## Coding Style\n')
-	if not has_python:
-		lines_to_add.append(python_line)
-	if not has_markdown:
-		lines_to_add.append(markdown_line)
-	if not has_repo_style:
-		lines_to_add.append(repo_style_line)
-	if not has_changelog:
-		lines_to_add.append(changelog_line)
-	if not has_user_request_line:
-		lines_to_add.append(user_request_line)
-	if not has_tests_required_line:
-		lines_to_add.append(tests_required_line)
-	if not has_tests_allowed:
-		lines_to_add.append(tests_allowed_line)
-
-	environment_lines: list[str] = []
-	if is_macos and not has_macos_python312_interpreter:
-		environment_lines.append(macos_python312_interpreter_line)
-	if is_macos and not has_macos_site_packages:
-		environment_lines.append(macos_site_packages_line)
-
-	if environment_lines:
-		if has_environment_header:
-			if insert_after_environment_header(environment_lines):
-				changed = True
-		else:
-			lines_to_add.append('\n')
-			lines_to_add.append(environment_header)
-			lines_to_add.extend(environment_lines)
-
-	if not lines_to_add and not changed:
-		return False
-
-	updated_content = ''.join(lines)
-	needs_newline = (len(updated_content) > 0 and not updated_content.endswith('\n'))
-	if dry_run:
-		return True
-
-	if lines_to_add:
-		if needs_newline:
-			updated_content += '\n'
-		updated_content += ''.join(lines_to_add)
-
-	with open(agents_path, 'w', encoding='utf-8') as f:
-		f.write(updated_content)
-
-	return True
-
-
-#============================================
-def build_agents_coding_style_block(style_paths: dict[str, str]) -> str:
-	"""
-	Build a minimal AGENTS.md block for new repos.
-
-	Args:
-		style_paths (dict[str, str]): Map of style filenames to repo-relative paths.
-
-	Returns:
-		str: Content for AGENTS.md with coding style and environment notes.
-	"""
-	python_path = style_paths['PYTHON_STYLE.md']
-	markdown_path = style_paths['MARKDOWN_STYLE.md']
-	repo_style_path = style_paths['REPO_STYLE.md']
-
-	lines = [
-		'## Coding Style\n',
-		f"See Python coding style in {python_path}.\n",
-		f"See Markdown style in {markdown_path}.\n",
-		f"See repo style in {repo_style_path}.\n",
-		'When making edits, document them in docs/CHANGELOG.md.\n',
-		(
-			"When in doubt, implement the changes the user asked for rather than waiting "
-			"for a response; the user is not the best reader and will likely miss your "
-			"request and then be confused why it was not implemented or fixed.\n"
-		),
-		"When changing code always run tests, documentation does not require tests.\n",
-		(
-			"Agents may run programs in the tests folder, including smoke tests "
-			"and pyflakes/mypy runner scripts.\n"
-		),
-	]
-
-	if sys.platform == 'darwin':
-		lines.extend(
-			[
-				'\n',
-				'## Environment\n',
-				(
-					"Codex must run Python using `/opt/homebrew/opt/python@3.12/bin/python3.12` "
-					"(use Python 3.12 only). This is only for Codex's runtime, not a "
-					"requirement for repo scripts.\n"
-				),
-				(
-					"On this user's macOS (Homebrew Python 3.12), Python modules are installed to "
-					"`/opt/homebrew/lib/python3.12/site-packages/`.\n"
-				),
-			]
-		)
-	return ''.join(lines)
-
-
-#============================================
-def ensure_agents_file(
-	agents_path: str,
-	style_paths: dict[str, str],
-	dry_run: bool
-) -> bool:
-	"""
-	Create AGENTS.md if missing; otherwise ensure it has coding style lines.
-
-	Args:
-		agents_path (str): Path to AGENTS.md.
-		style_paths (dict[str, str]): Map of style filenames to repo-relative paths.
-		dry_run (bool): If True, do not write changes.
-
-	Returns:
-		bool: True if file was created or modified, False otherwise.
-	"""
-	if not os.path.exists(agents_path):
-		if dry_run:
-			return True
-		content = build_agents_coding_style_block(style_paths)
-		with open(agents_path, 'w', encoding='utf-8') as f:
-			f.write(content)
-		return True
-
-	return ensure_agents_coding_style(agents_path, style_paths, dry_run)
 
 
 #============================================
@@ -750,7 +520,7 @@ def resolve_source_dir(base_dir: str, source_dir_arg: str | None) -> str:
 	"""
 	source_dir = source_dir_arg
 	if source_dir is None:
-		preferred_source = os.path.join(base_dir, 'junk-drawer')
+		preferred_source = os.path.join(base_dir, 'starter_repo_template')
 		if os.path.isdir(preferred_source):
 			source_dir = preferred_source
 		else:
@@ -765,17 +535,39 @@ def resolve_source_dir(base_dir: str, source_dir_arg: str | None) -> str:
 
 
 #============================================
+def resolve_source_file(source_candidates: list[str], source_name: str) -> str:
+	"""
+	Resolve a source file from candidate directories.
+
+	Args:
+		source_candidates (list[str]): Ordered directories to search.
+		source_name (str): Filename to locate.
+
+	Returns:
+		str: Absolute path to the resolved source file.
+	"""
+	for candidate in source_candidates:
+		candidate_file = os.path.join(candidate, source_name)
+		if os.path.isfile(candidate_file):
+			return candidate_file
+	raise FileNotFoundError(
+		f"Source file not found in {source_candidates}: {source_name}"
+	)
+
+
+#============================================
 def build_source_maps(
 	source_dir: str,
 	styles: list[str],
+	noexist_only_style_files: list[str],
 	devel_scripts: list[str],
 	test_scripts: list[str],
-) -> tuple[dict[str, str], dict[str, str], dict[str, str], list[str]]:
+) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str], list[str]]:
 	"""
 	Build source-file maps for style guides, devel scripts, and test scripts.
 
 	Returns:
-		tuple: (style_map, devel_map, test_map, final_test_scripts)
+		tuple: (style_map, noexist_style_map, devel_map, test_map, final_test_scripts)
 	"""
 	source_candidates = [
 		os.path.join(source_dir, 'docs'),
@@ -784,17 +576,15 @@ def build_source_maps(
 
 	source_map: dict[str, str] = {}
 	for filename in styles:
-		source_file = None
-		for candidate in source_candidates:
-			candidate_file = os.path.join(candidate, filename)
-			if os.path.isfile(candidate_file):
-				source_file = candidate_file
-				break
-		if source_file is None:
-			raise FileNotFoundError(
-				f"Source file not found in {source_candidates}: {filename}"
-			)
-		source_map[filename] = source_file
+		source_map[filename] = resolve_source_file(source_candidates, filename)
+
+	noexist_style_source_map: dict[str, str] = {}
+	for target_rel_path in noexist_only_style_files:
+		source_name = os.path.basename(target_rel_path)
+		noexist_style_source_map[target_rel_path] = resolve_source_file(
+			source_candidates,
+			source_name,
+		)
 
 	source_devel_dir = os.path.join(source_dir, 'devel')
 	devel_source_map: dict[str, str] = {}
@@ -831,7 +621,13 @@ def build_source_maps(
 			)
 		test_source_map[filename] = source_file
 
-	return (source_map, devel_source_map, test_source_map, final_test_scripts)
+	return (
+		source_map,
+		noexist_style_source_map,
+		devel_source_map,
+		test_source_map,
+		final_test_scripts,
+	)
 
 
 #============================================
@@ -1043,7 +839,7 @@ def print_summary_report(summary: dict[str, object]) -> None:
 #============================================
 def main():
 	"""
-	Copy style guides to each repo under base_dir and update AGENTS.md if needed.
+	Copy shared docs/scripts into each repo under base_dir.
 	"""
 	args = parse_args()
 
@@ -1051,11 +847,19 @@ def main():
 	target_repo = resolve_target_repo(base_dir, args.repo_name)
 	source_dir = resolve_source_dir(base_dir, args.source_dir)
 	styles = list(STYLE_FILES)
+	noexist_only_style_files = list(NOEXIST_ONLY_STYLE_FILES)
 	devel_scripts = list(DEVEL_SCRIPTS)
 	test_scripts = list(TEST_SCRIPTS)
-	source_map, devel_source_map, test_source_map, test_scripts = build_source_maps(
+	(
+		source_map,
+		noexist_style_source_map,
+		devel_source_map,
+		test_source_map,
+		test_scripts,
+	) = build_source_maps(
 		source_dir,
 		styles,
+		noexist_only_style_files,
 		devel_scripts,
 		test_scripts,
 	)
@@ -1064,6 +868,15 @@ def main():
 	skipped_same_by_file = {filename: 0 for filename in styles}
 	copied_by_file = {filename: 0 for filename in styles}
 	updated_by_file = {filename: 0 for filename in styles}
+	skipped_existing_noexist_styles_by_file = {
+		filename: 0 for filename in noexist_only_style_files
+	}
+	skipped_source_noexist_styles_by_file = {
+		filename: 0 for filename in noexist_only_style_files
+	}
+	copied_noexist_styles_by_file = {
+		filename: 0 for filename in noexist_only_style_files
+	}
 	skipped_same_tests_by_file = {filename: 0 for filename in test_scripts}
 	copied_tests_by_file = {filename: 0 for filename in test_scripts}
 	updated_tests_by_file = {filename: 0 for filename in test_scripts}
@@ -1181,6 +994,46 @@ def main():
 				counts['errors'] += 1
 				print(f"{Colors.RED}[ERROR]{Colors.RESET} {repo_dir}: {e}")
 
+		for target_rel_path in noexist_only_style_files:
+			source_file = noexist_style_source_map[target_rel_path]
+			dest_file = os.path.join(repo_dir, target_rel_path)
+
+			if os.path.abspath(dest_file) == source_file:
+				counts['skipped_source_noexist_styles'] += 1
+				skipped_source_noexist_styles_by_file[target_rel_path] += 1
+				print(f"{Colors.CYAN}[SKIP SOURCE]{Colors.RESET} {dest_file}")
+				continue
+
+			try:
+				if os.path.exists(dest_file):
+					counts['skipped_existing_noexist_styles'] += 1
+					skipped_existing_noexist_styles_by_file[target_rel_path] += 1
+					continue
+				dest_parent = os.path.dirname(dest_file)
+				if dest_parent and not os.path.isdir(dest_parent):
+					if args.dry_run:
+						print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} mkdir {dest_parent}")
+					else:
+						os.makedirs(dest_parent, exist_ok=True)
+
+				if args.dry_run:
+					print(
+						f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} "
+						f"copy {source_file} -> {dest_file} (missing only)"
+					)
+				else:
+					shutil.copy2(source_file, dest_file)
+				counts['copied_noexist_styles'] += 1
+				copied_noexist_styles_by_file[target_rel_path] += 1
+				if not args.dry_run:
+					print(
+						f"{Colors.BLUE}[COPIED]{Colors.RESET} "
+						f"{source_file} -> {dest_file} (missing only)"
+					)
+			except Exception as e:
+				counts['errors'] += 1
+				print(f"{Colors.RED}[ERROR]{Colors.RESET} {repo_dir}: {e}")
+
 		repo_python = repo_has_python_files(repo_dir)
 		for filename in test_scripts:
 			if filename.startswith('test_') and filename.endswith('.py') and not repo_python:
@@ -1276,35 +1129,6 @@ def main():
 				counts['errors'] += 1
 				print(f"{Colors.RED}[ERROR]{Colors.RESET} {repo_dir}: {e}")
 
-		agents_path = os.path.join(repo_dir, 'AGENTS.md')
-		try:
-			style_paths = {
-				filename: os.path.relpath(
-					os.path.join(dest_dir, filename),
-					repo_dir
-				)
-				for filename in styles
-			}
-			was_existing = os.path.exists(agents_path)
-			changed = ensure_agents_file(
-				agents_path,
-				style_paths,
-				args.dry_run,
-			)
-			if changed:
-				if args.dry_run:
-					if was_existing:
-						print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} append AGENTS.md guidance block to {agents_path}")
-					else:
-						print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} create {agents_path}")
-				if was_existing:
-					counts['updated_agents'] += 1
-				else:
-					counts['created_agents'] += 1
-		except Exception as e:
-			counts['errors'] += 1
-			print(f"{Colors.RED}[ERROR]{Colors.RESET} {repo_dir}: {e}")
-
 	summary = {
 		'context': {
 			'base_dir': base_dir,
@@ -1329,6 +1153,18 @@ def main():
 					'value': counts['skipped_non_repo'],
 					'expected': COUNTER_EXPECTED['skipped_non_repo'],
 					'always_color': Colors.YELLOW,
+				},
+				{
+					'label': 'no-overwrite files skipped (already exists)',
+					'value': counts['skipped_existing_noexist_styles'],
+					'expected': COUNTER_EXPECTED['skipped_existing_noexist_styles'],
+					'always_color': Colors.GREEN,
+				},
+				{
+					'label': 'no-overwrite files skipped (source)',
+					'value': counts['skipped_source_noexist_styles'],
+					'expected': COUNTER_EXPECTED['skipped_source_noexist_styles'],
+					'always_color': Colors.GREEN,
 				},
 				{
 					'label': 'tests scripts skipped (same)',
@@ -1378,6 +1214,18 @@ def main():
 					'title': 'Skipped (same) tests scripts:',
 					'filenames': test_scripts,
 					'counts': skipped_same_tests_by_file,
+					'always_color': Colors.GREEN,
+				},
+				{
+					'title': 'No-overwrite files skipped (already exists):',
+					'filenames': noexist_only_style_files,
+					'counts': skipped_existing_noexist_styles_by_file,
+					'always_color': Colors.GREEN,
+				},
+				{
+					'title': 'No-overwrite files skipped (source):',
+					'filenames': noexist_only_style_files,
+					'counts': skipped_source_noexist_styles_by_file,
 					'always_color': Colors.GREEN,
 				},
 				{
@@ -1506,15 +1354,9 @@ def main():
 					'positive_color': Colors.BLUE,
 				},
 				{
-					'label': 'AGENTS.md created',
-					'value': counts['created_agents'],
-					'expected': COUNTER_EXPECTED['created_agents'],
-					'positive_color': Colors.BLUE,
-				},
-				{
-					'label': 'AGENTS.md lines added',
-					'value': counts['updated_agents'],
-					'expected': COUNTER_EXPECTED['updated_agents'],
+					'label': 'No-overwrite files copied',
+					'value': counts['copied_noexist_styles'],
+					'expected': COUNTER_EXPECTED['copied_noexist_styles'],
 					'positive_color': Colors.BLUE,
 				},
 				{
@@ -1541,6 +1383,12 @@ def main():
 					'title': 'Style guides updated by file:',
 					'filenames': styles,
 					'counts': updated_by_file,
+					'positive_color': Colors.BLUE,
+				},
+				{
+					'title': 'No-overwrite files copied by file:',
+					'filenames': noexist_only_style_files,
+					'counts': copied_noexist_styles_by_file,
 					'positive_color': Colors.BLUE,
 				},
 				{
