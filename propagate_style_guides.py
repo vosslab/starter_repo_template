@@ -27,6 +27,7 @@ NOEXIST_ONLY_STYLE_FILES = [
 	'AGENTS.md',
 	'docs/AUTHORS.md',
 	'source_me.sh',
+	'pip_requirements-dev.txt',
 ]
 DEVEL_SCRIPTS = [
 	'commit_changelog.py',
