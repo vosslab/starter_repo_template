@@ -2,6 +2,8 @@ import ast
 import os
 import tokenize
 
+import pytest
+
 import git_file_utils
 
 REPO_ROOT = git_file_utils.get_repo_root()
@@ -116,43 +118,46 @@ _FILES = git_file_utils.collect_files(REPO_ROOT, gather_files, gather_changed_fi
 
 
 #============================================
-def write_import_dot_report(issues: list[str]) -> str:
+@pytest.fixture(scope="module", autouse=True)
+def reset_import_dot_report() -> None:
 	"""
-	Write all relative import violations to a dedicated report file.
+	Remove stale report file before this module runs.
 	"""
-	report_path = os.path.join(REPO_ROOT, REPORT_NAME)
-	lines = [
-		"Import dot report",
-		"Violations:",
-	]
-	lines.extend(issues)
-	with open(report_path, "w", encoding="utf-8") as handle:
-		handle.write("\n".join(lines))
-		handle.write("\n")
-	return report_path
-
-
-#============================================
-def test_import_dot() -> None:
-	"""Report relative from-import usage across scanned Python files."""
 	report_path = os.path.join(REPO_ROOT, REPORT_NAME)
 	if os.path.exists(report_path):
 		os.remove(report_path)
 
-	issues = []
-	for file_path in _FILES:
-		matches = find_relative_imports(file_path)
-		if not matches:
-			continue
-		rel_path = os.path.relpath(file_path, REPO_ROOT)
-		for line_no, import_root in matches:
-			issues.append(format_issue(rel_path, line_no, import_root))
 
-	if not issues:
+#============================================
+def append_import_dot_report(issues: list[str]) -> str:
+	"""
+	Append relative import violations to the dedicated report file.
+	"""
+	report_path = os.path.join(REPO_ROOT, REPORT_NAME)
+	file_exists = os.path.exists(report_path)
+	with open(report_path, "a", encoding="utf-8") as handle:
+		if not file_exists:
+			handle.write("Import dot report\n")
+			handle.write("Violations:\n")
+		for issue in issues:
+			handle.write(issue + "\n")
+	return report_path
+
+
+#============================================
+@pytest.mark.parametrize(
+	"file_path", _FILES,
+	ids=lambda p: os.path.relpath(p, REPO_ROOT),
+)
+def test_import_dot(file_path: str) -> None:
+	"""Report relative from-import usage in a single Python file."""
+	matches = find_relative_imports(file_path)
+	if not matches:
 		return
-
+	rel_path = os.path.relpath(file_path, REPO_ROOT)
+	issues = [format_issue(rel_path, line_no, import_root) for line_no, import_root in matches]
 	issues = sorted(set(issues))
-	report_path = write_import_dot_report(issues)
+	report_path = append_import_dot_report(issues)
 	display_report = os.path.relpath(report_path, REPO_ROOT)
 	raise AssertionError(
 		"relative import usage detected:\n"
