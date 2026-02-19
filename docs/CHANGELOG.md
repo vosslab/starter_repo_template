@@ -1,3 +1,8 @@
+## 2026-02-19
+
+- Added `tests/test_import_dot.py` to fail on relative from-import statements such as `from . import x` and `from .module import x`.
+- Updated `propagate_style_guides.py` so `test_import_dot.py` is included in propagated test scripts.
+
 ## 2026-02-16
 
 - Fixed false positives in `tests/test_shebangs.py` where Rust inner attributes (`#![...]`) were misidentified as shebangs, causing `.rs` files to be flagged under `shebang_not_executable`.

@@ -38,6 +38,7 @@ TEST_SCRIPTS = [
 	'fix_ascii_compliance.py',
 	'fix_whitespace.py',
 	'git_file_utils.py',
+	'test_import_dot.py',
 	'test_import_requirements.py',
 	'test_import_star.py',
 ]
