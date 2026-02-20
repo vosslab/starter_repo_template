@@ -5,6 +5,7 @@
 - Updated `propagate_style_guides.py` and `.gitignore` to include `test_init_files.py`.
 - Simplified gitignore management to require `report_*.txt` and clean up legacy per-report entries in `propagate_style_guides.py`.
 - Updated `tests/test_init_files.py` so the no-`__init__.py` case reports pass instead of skip.
+- Updated `propagate_style_guides.py` to skip propagating `source_me.sh` into repositories that are already present on `PATH` (for example `junk-drawer`).
 
 ## 2026-02-19
 

@@ -170,6 +170,29 @@ def is_repo_dir(repo_dir: str) -> bool:
 
 
 #============================================
+def normalize_path(path: str) -> str:
+	"""
+	Normalize a path for stable filesystem comparisons.
+	"""
+	return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
+#============================================
+def repo_is_on_path(repo_dir: str) -> bool:
+	"""
+	Check whether the repository directory is present in PATH.
+	"""
+	target = normalize_path(repo_dir)
+	path_env = os.environ.get('PATH', '')
+	for path_entry in path_env.split(os.pathsep):
+		if not path_entry:
+			continue
+		if normalize_path(path_entry) == target:
+			return True
+	return False
+
+
+#============================================
 def find_repo_root(start_dir: str) -> str | None:
 	"""
 	Find the nearest ancestor that contains the expected style guides.
@@ -1010,6 +1033,18 @@ def main():
 				continue
 
 			try:
+				if target_rel_path == 'source_me.sh' and repo_is_on_path(repo_dir):
+					if args.dry_run:
+						print(
+							f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} "
+							f"skip {dest_file} (repo is already on PATH)"
+						)
+					else:
+						print(
+							f"{Colors.CYAN}[SKIP PATH]{Colors.RESET} "
+							f"{dest_file} (repo is already on PATH)"
+						)
+					continue
 				if os.path.exists(dest_file):
 					counts['skipped_existing_noexist_styles'] += 1
 					skipped_existing_noexist_styles_by_file[target_rel_path] += 1
