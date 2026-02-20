@@ -38,6 +38,7 @@ TEST_SCRIPTS = [
 	'fix_ascii_compliance.py',
 	'fix_whitespace.py',
 	'git_file_utils.py',
+	'test_init_files.py',
 	'test_import_dot.py',
 	'test_import_requirements.py',
 	'test_import_star.py',
@@ -55,19 +56,19 @@ DEPRECATED_GITIGNORE_ENTRIES = [
 	'bandit.txt',
 	'pyright.txt',
 	'ascii_compliance.txt',
-]
-REQUIRED_GITIGNORE_ENTRIES = [
-
 	'report_shebang.txt',
 	'report_pyflakes.txt',
 	'report_ascii_compliance.txt',
 	'report_import_star.txt',
 	'report_import_dot.txt',
 	'report_import_requirements.txt',
-	'.DS_Store',
+	'report_init_files.txt',
 	'report_bandit.txt',
 	'report_pyright.txt',
-
+]
+REQUIRED_GITIGNORE_ENTRIES = [
+	'report_*.txt',
+	'.DS_Store',
 ]
 SKIP_WALK_DIRS = {
 	'.git',

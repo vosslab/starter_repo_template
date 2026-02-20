@@ -1,3 +1,11 @@
+## 2026-02-20
+
+- Added `tests/test_init_files.py` to enforce surface-level `__init__.py` style rules from `docs/PYTHON_STYLE.md`, including checks for non-docstring implementation, imports, exports/maps, global assignments, and `__version__` assignments.
+- Scoped `tests/test_init_files.py` to analyze only substantial `__init__.py` files and write violations to `report_init.txt` with stale report cleanup at test startup.
+- Updated `propagate_style_guides.py` and `.gitignore` to include `test_init_files.py`.
+- Simplified gitignore management to require `report_*.txt` and clean up legacy per-report entries in `propagate_style_guides.py`.
+- Updated `tests/test_init_files.py` so the no-`__init__.py` case reports pass instead of skip.
+
 ## 2026-02-19
 
 - Added `tests/test_import_dot.py` to fail on relative from-import statements such as `from . import x` and `from .module import x`.
