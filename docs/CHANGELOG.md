@@ -1,3 +1,9 @@
+## 2026-02-25
+
+### Fixes and Maintenance
+
+- Fixed `devel/commit_changelog.py` to detect staged (`git add`) changelog changes by falling back to `git diff --cached` when the unstaged diff is empty.
+
 ## 2026-02-22
 
 - Updated `docs/REPO_STYLE.md` to require consistent section headings for each changelog day block (`Added`, `Changed`, `Fixed`, `Failures`, `Decisions`) and to keep empty sections with `- None.`.
