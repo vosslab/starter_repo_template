@@ -1,3 +1,16 @@
+## 2026-04-01
+
+### Additions and New Features
+
+- Added "Common misconceptions" section at the top of `docs/PYTHON_STYLE.md` highlighting frequently violated rules for AI agents.
+- Added "DO NOT HIDE BUGS WITH DEFAULTS" section to `docs/PYTHON_STYLE.md` covering `dict.get()` misuse, `value or fallback` patterns, and silent exception swallowing.
+- Added "IMPORT REQUIREMENTS" section to `docs/PYTHON_STYLE.md` documenting that all imports must come from stdlib, repo-local modules, or declared pip dependencies.
+- Added explicit ban on relative imports (`from . import`) to the IMPORTING section of `docs/PYTHON_STYLE.md`.
+
+### Behavior or Interface Changes
+
+- Clarified shebang rules in `docs/PYTHON_STYLE.md` to explicitly state shebangs belong only on runnable scripts with main guards, not on library modules, test files, or helpers.
+
 ## 2026-03-13
 
 ### Additions and New Features
