@@ -16,5 +16,5 @@ Only `README.md` and `docs/CHANGELOG.md` are intentionally repository-specific; 
 Run one focused repo check:
 
 ```bash
-/opt/homebrew/opt/python@3.12/bin/python3.12 -m pytest tests/test_shebangs.py -q
+pytest tests/
 ```

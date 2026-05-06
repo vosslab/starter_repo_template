@@ -1,3 +1,15 @@
+## 2026-05-06
+
+### Behavior or Interface Changes
+
+- Split pytest-specific testing guidance out of `docs/PYTHON_STYLE.md` into the new `docs/PYTEST_STYLE.md`, matching the existing pattern of separate tool and language docs.
+- Replaced duplicated pytest failure triage details in `docs/REPO_STYLE.md` with a link to `docs/PYTEST_STYLE.md`.
+- Clarified `docs/PLAYWRIGHT_USAGE.md` so Playwright `.mjs` scripts live in `tests/`, can coexist with pytest `test_*.py` files, and follow the `docs/TYPESCRIPT_STYLE.md` testing convention.
+- Updated `docs/PYTEST_STYLE.md` to make `conftest.py` the home for pytest setup and set `pytest tests/` as the default pytest command.
+- Standardized repo-owned pytest command examples to use `pytest tests/`, while keeping `source source_me.sh && python...` for normal Python script execution.
+- Documented `docs/CLAUDE_HOOK_USAGE_GUIDE.md` as a generated hook behavior reference instead of a repo style source of truth.
+- Added `docs/PYTEST_STYLE.md` to the centrally maintained docs list in `docs/REPO_STYLE.md`.
+
 ## 2026-04-18
 
 ### Behavior or Interface Changes
