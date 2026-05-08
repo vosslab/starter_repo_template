@@ -39,6 +39,7 @@ NOEXIST_ONLY_STYLE_FILES = [
 DEVEL_SCRIPTS = [
 	'commit_changelog.py',
 	'submit_to_pypi.py',
+	'setup_playwright.sh',
 ]
 TEST_SCRIPTS = [
 	'check_ascii_compliance.py',
@@ -52,6 +53,9 @@ TEST_SCRIPTS = [
 	# Centrally-maintained navigational README for tests/. Overwrite-always,
 	# same semantics as the test scripts above; do not edit per-repo.
 	'TESTS_README.md',
+	# Playwright shared helper. The subdir prefix is intentional; see the
+	# convention note in build_source_maps() for how subdir entries resolve.
+	'playwright/repo_root.mjs',
 ]
 DEPRECATED_TEST_SCRIPTS = [
 	'run_ascii_compliance.sh',
@@ -111,6 +115,7 @@ COUNTER_EXPECTED = {
 	'skipped_tests_no_python': 0,
 	'removed_deprecated_tests': 0,
 	'created_conftest': 0,
+	'updated_conftest': 0,
 	'git_perms_changed': 0,
 	'git_perms_unchanged': 0,
 	'created_tests_dirs': 0,
@@ -630,6 +635,47 @@ def merge_claude_md(source_file: str, dest_file: str) -> str:
 
 
 #============================================
+def merge_conftest(source_file: str, dest_file: str) -> str | None:
+	"""
+	Inject the canonical collect_ignore block into a destination conftest.py.
+
+	Mirrors merge_claude_md: source is canonical for the collect_ignore line,
+	but any other content the repo has added (imports, fixtures, etc.) is
+	preserved. Returns the merged text when the destination needs an update,
+	or None when no change is needed.
+
+	Args:
+		source_file (str): Path to the canonical tests/conftest.py.
+		dest_file (str): Path to the consumer repo's tests/conftest.py.
+
+	Returns:
+		str | None: Merged content when an update is needed, None otherwise.
+	"""
+	with open(source_file, 'r', encoding='utf-8') as f:
+		source_text = f.read()
+	# dest does not exist yet: create it from the canonical source verbatim
+	if not os.path.isfile(dest_file):
+		return source_text
+	with open(dest_file, 'r', encoding='utf-8') as f:
+		dest_text = f.read()
+	# dest already has its own collect_ignore; trust the repo
+	if 'collect_ignore' in dest_text:
+		return None
+	# empty dest: just write the canonical source verbatim. Source always
+	# contains the collect_ignore line, so it can never equal an empty dest;
+	# no further check is needed before returning source_text.
+	if dest_text.strip() == '':
+		return source_text
+	# dest has custom code but no collect_ignore: prepend source block with
+	# a blank-line separator, then preserve dest content verbatim so any
+	# leading license header or blank lines the repo added survive.
+	merged = source_text.rstrip() + '\n\n' + dest_text
+	if not merged.endswith('\n'):
+		merged += '\n'
+	return merged
+
+
+#============================================
 def build_source_maps(
 	source_dir: str,
 	styles: list[str],
@@ -712,6 +758,10 @@ def build_source_maps(
 			continue
 		final_test_scripts.append(entry)
 
+	# Subdir convention: an entry like 'playwright/repo_root.mjs' resolves
+	# to <source>/tests/playwright/repo_root.mjs and lands at the same
+	# relative path under each consumer's tests/. The destination parent
+	# is created on demand by the test copy loop in main().
 	test_source_map: dict[str, str] = {}
 	for filename in final_test_scripts:
 		source_file = os.path.join(source_tests_dir, filename)
@@ -1033,15 +1083,33 @@ def main():
 			if args.dry_run:
 				print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} mkdir {tests_dir}")
 			counts['created_tests_dirs'] += 1
+		# Ensure tests/conftest.py contains the canonical
+		# collect_ignore = ["e2e", "playwright"] line. Mirrors the
+		# merge_claude_md pattern: source is canonical for the bit we care
+		# about (collect_ignore), but any other content the repo has added
+		# (fixtures, imports, etc.) is preserved. Only inject when the
+		# 'collect_ignore' token is absent from the destination.
 		conftest_path = os.path.join(tests_dir, 'conftest.py')
-		if not os.path.isfile(conftest_path):
-			if args.dry_run:
-				print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} create {conftest_path}")
-			else:
-				with open(conftest_path, 'w', encoding='utf-8'):
-					pass
-				print(f"{Colors.BLUE}[CREATED]{Colors.RESET} {conftest_path}")
-			counts['created_conftest'] += 1
+		source_conftest = os.path.join(source_dir, 'tests', 'conftest.py')
+		# skip the source repo itself: do not rewrite the canonical conftest
+		if os.path.abspath(conftest_path) != os.path.abspath(source_conftest):
+			merged_conftest = merge_conftest(source_conftest, conftest_path)
+			if merged_conftest is not None:
+				dest_existed = os.path.isfile(conftest_path)
+				if args.dry_run:
+					action = 'inject collect_ignore into' if dest_existed else 'create'
+					print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} {action} {conftest_path}")
+				else:
+					with open(conftest_path, 'w', encoding='utf-8') as f:
+						f.write(merged_conftest)
+					if dest_existed:
+						print(f"{Colors.BLUE}[MERGED]{Colors.RESET} injected collect_ignore into {conftest_path}")
+					else:
+						print(f"{Colors.BLUE}[CREATED]{Colors.RESET} {conftest_path}")
+				if dest_existed:
+					counts['updated_conftest'] += 1
+				else:
+					counts['created_conftest'] += 1
 
 		counts['removed_deprecated_tests'] += remove_deprecated_tests(tests_dir, args.dry_run)
 
@@ -1197,6 +1265,16 @@ def main():
 				continue
 
 			try:
+				# Subdir entries (e.g. 'playwright/repo_root.mjs') need their
+				# parent dir created on demand; see the convention note in
+				# build_source_maps() for how subdir entries resolve.
+				dest_parent = os.path.dirname(dest_file)
+				if dest_parent and not os.path.isdir(dest_parent):
+					if args.dry_run:
+						print(f"{Colors.YELLOW}[DRY RUN]{Colors.RESET} mkdir {dest_parent}")
+					else:
+						os.makedirs(dest_parent, exist_ok=True)
+
 				dest_exists = os.path.isfile(dest_file)
 				is_same = False
 				if dest_exists:
@@ -1481,6 +1559,12 @@ def main():
 					'label': 'tests/conftest.py created',
 					'value': counts['created_conftest'],
 					'expected': COUNTER_EXPECTED['created_conftest'],
+					'positive_color': Colors.BLUE,
+				},
+				{
+					'label': 'tests/conftest.py updated (collect_ignore injected)',
+					'value': counts['updated_conftest'],
+					'expected': COUNTER_EXPECTED['updated_conftest'],
 					'positive_color': Colors.BLUE,
 				},
 				{

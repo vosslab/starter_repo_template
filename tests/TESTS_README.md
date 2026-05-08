@@ -12,6 +12,7 @@ tests/
   conftest.py includes:  collect_ignore = ["e2e", "playwright"]
   playwright/            browser-driven tests (Playwright)
     test_*.mjs           smoke/layout/regression
+    repo_root.mjs        shared helper: exports REPO_ROOT (centrally propagated)
     helpers.mjs          shared test utilities
     fixtures/            test data
     e2e/                 OPTIONAL: full-path browser walkthroughs
