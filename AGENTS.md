@@ -2,7 +2,8 @@
 See Python coding style in docs/PYTHON_STYLE.md.
 See Markdown style in docs/MARKDOWN_STYLE.md.
 See repo style in docs/REPO_STYLE.md.
-When making edits, document them in docs/CHANGELOG.md.
+Follow the core philosophies in [docs/REPO_STYLE.md](docs/REPO_STYLE.md#core-philosophies): prefer long-term fixes, fix design causes rather than symptoms, use fresh subagents for independent tasks, and decompose hard problems into atomic tasks.
+For standalone edits, update docs/CHANGELOG.md directly. For manager-driven multi-subagent work, assign one docs subagent to write a consolidated changelog entry.
 When in doubt, implement the changes the user asked for rather than waiting for a response; the user is not the best reader and will likely miss your request and then be confused why it was not implemented or fixed.
 When changing code always run focused tests on changed code, documentation does not require tests.
 Agents may find pytest programs to run in the tests folder, including smoke tests and pyflakes runner scripts. These should all be capable of the -k flag, such as pytest test_feature.py -k changed_file.py
