@@ -1,3 +1,9 @@
+## 2026-05-09
+
+### Behavior or Interface Changes
+
+- Clarified headless behavior in `docs/PLAYWRIGHT_USAGE.md`. Added a `## Headless by default` section between `## Script template` and `## Common patterns` stating that the canonical `chromium.launch()` with no arguments already defaults to `headless: true`, so existing scripts run headless without intervention. Codified the agent rule explicitly: do not pass `headless: false`, do not add `--headed`; the default is correct. Reserved the override for humans who explicitly want to watch a local debug session. Reason: agents have been "helpfully" overriding the default and flooding the desktop with browser windows during otherwise-clean CI-style runs. Added a matching Troubleshooting row ("Browser windows pop up during test runs") so the symptom maps back to the rule.
+
 ## 2026-05-08
 
 ### Additions and New Features
